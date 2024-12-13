@@ -15,7 +15,7 @@ Flask-Compress==1.17
 folium==0.19.2
 fonttools==4.55.3
 geopandas==1.0.1
-gtfs-kit==8.1.1
+gtfs-kit
 gtfs-realtime-bindings==1.0.0
 gunicorn==20.0.4
 idna==3.10
