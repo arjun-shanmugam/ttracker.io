@@ -1,42 +1,115 @@
-from dash import Dash, callback, html, dcc
-import dash_bootstrap_components as dbc
-import numpy as np
+import threading
+import time
+import dash
 import pandas as pd
-import matplotlib as mpl
-import gunicorn                     #whilst your local machine's webserver doesn't need this, Heroku's linux webserver (i.e. dyno) does. I.e. This is your HTTP server
-from whitenoise import WhiteNoise   #for serving static files on Heroku
+import psutil
+from dash import dcc, Input, Output, html
+import plotly.graph_objects as go
+import dash_bootstrap_components as dbc
+from ttracker.plotting_tools import plot_map
+from ttracker.system import System
+# Memory monitoring function
 
-# Instantiate dash app
-app = Dash(__name__, external_stylesheets=[dbc.themes.FLATLY])
+# Initialize the Dash app
+app = dash.Dash(__name__, external_stylesheets=[dbc.themes.BOOTSTRAP], update_title=None)
 
-# Reference the underlying flask app (Used by gunicorn webserver in Heroku production deployment)
-server = app.server 
+# prepare data
+mbta_system = System("./static/data/clean/stations.csv",
+                     "./static/data/clean/links.csv",
+                     "./static/data/clean/stop_codes_to_station_id_crosswalk.csv",
+                     "https://cdn.mbta.com/realtime/VehiclePositions.pb")
+stations_df = mbta_system.station_data.copy()
+stations_df.loc[:, 'map_size'] = stations_df['map_color'].replace({'black': 5,
+                                                                   'red': 10,
+                                                                   'green': 10,
+                                                                   'blue': 10,
+                                                                   'orange': 10})
+links_df = mbta_system.links_data.copy()
+charles_river_df = pd.read_csv("./static/data/clean/charles_river.csv")
 
-# Enable Whitenoise for serving static files from Heroku (the /static folder is seen as root by Heroku) 
-server.wsgi_app = WhiteNoise(server.wsgi_app, root='static/') 
+# Create figure object
+base_figure = go.Figure(layout={'dragmode': False})
+plot_map("mbta", base_figure, links_df, stations_df, charles_river_df)
 
-# Define Dash layout
-def create_dash_layout(app):
+# Layout of the app
+app.css.config.serve_locally = True
+app.layout = html.Div(children=[
+    dash.html.Center([html.H1("ttracker.io", style={
+        "position": "fixed",
+        "top": 0,
+        "left": 0,
+        "right": 0,
+        'justify-content': 'center',
+        'align-items': 'center',
 
-    # Set browser tab title
-    app.title = "Your app title" 
-    
-    # Header
-    header = html.Div([html.Br(), dcc.Markdown(""" # Hi. I'm your Dash app."""), html.Br()])
-    
-    # Body 
-    body = html.Div([dcc.Markdown(""" ## I'm ready to serve static files on Heroku. Just look at this! """), html.Br(), html.Img(src='charlie.png')])
+        "background-color": "white",
+        'display': 'inline-block'
+    })]
+                     ),
+    html.Div(children=[dbc.Row([
+        dbc.Col([dcc.Graph(id='train-map',
+                           figure=base_figure,
+                           style={
+                               'border': '2px solid black',
+                               'padding': '10px',
+                               'max-width': '100vw',  # Ensure the graph doesn't overflow the viewport
+                               'max-height': '100vh',  # Ensure the graph doesn't overflow the viewport
+                               'width': '100%',  # Graph takes 100% of the available width
+                               'height': '100%'  # Graph takes 100% of the available height
+                           },
+                           config={'modeBarButtonsToRemove': ['zoom2d', 'pan2d', 'select2d', 'lasso2d', 'zoomIn2d',
+                                                              'zoomOut2d', 'autoScale2d', 'resetScale2d'],
+                                   'displayModeBar': False,  # Disable mode bar
+                                   'scrollZoom': False,  # Disable zooming with mouse scroll
+                                   'showTips': False,  # Disable tips
+                                   'displaylogo': False  # Disable plotly logo
 
-    # Footer
-    footer = html.Div([html.Br(), html.Br(), dcc.Markdown(""" ### Built with ![Image](heart.png) in Python using [Dash](https://plotly.com/dash/)""")])
-    
-    # Assemble dash layout 
-    app.layout = html.Div([header, body, footer])
+                                   }),
+                 ]),
+        dcc.Interval(id='interval-component', interval=3000, n_intervals=0)  # Update every second
+    ])], style={
+        'display': 'flex',  # Enable flexbox
+        'justify-content': 'center',  # Center horizontally
+        'align-items': 'center',  # Center vertically
+        'height': 'calc(100vh - 50px)',  # Subtract the height of the title (estimate 120px)
+    })
 
-    return app
+])
 
-# Construct the dash layout
-create_dash_layout(app)
 
-# Run flask app
-if __name__ == "__main__": app.run_server(debug=False, host='0.0.0.0', port=8050)
+# Callback to update train positions
+@app.callback(
+    Output('train-map', 'figure'),
+    Input('interval-component', 'n_intervals')
+)
+def update_train_positions(n_intervals):
+    new_x, new_y, color, hover_text = mbta_system.update_trains()
+
+    # Create a new figure based on the base map
+    updated_figure = base_figure
+    updated_figure['data'] = updated_figure['data'][:-1]
+
+
+    # Add train positions to the map
+    updated_figure.add_trace(
+        go.Scatter(
+            x=new_x,
+            y=new_y,
+            mode='markers',
+            marker=dict(color=color, size=5, line=dict(
+                        color='black',  # Outline color
+                        width=1  # Outline width
+                    )),
+            name='Trains',
+            text=hover_text,
+            hoverinfo='text',
+            showlegend=False
+        )
+    )
+
+    return updated_figure
+
+
+# Run the app
+if __name__ == '__main__':
+    app.run_server(debug=False)
