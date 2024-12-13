@@ -38,7 +38,7 @@ psutil==6.1.0
 pycountry==24.6.1
 pyogrio==0.10.0
 pyparsing==3.2.0
-pyproj==3.7.0
+pyproj
 python-dateutil==2.9.0.post0
 pytz==2024.2
 requests==2.32.3
