@@ -12,7 +12,7 @@ from ttracker.system import System
 
 # Initialize the Dash app
 app = dash.Dash(__name__, external_stylesheets=[dbc.themes.BOOTSTRAP], update_title=None)
-
+server = app.server
 # prepare data
 mbta_system = System("./static/data/clean/stations.csv",
                      "./static/data/clean/links.csv",
