@@ -14,9 +14,9 @@ from ttracker.system import System
 app = dash.Dash(__name__, external_stylesheets=[dbc.themes.BOOTSTRAP], update_title=None)
 
 # prepare data
-mbta_system = System("./data/clean/stations.csv",
-                     "./data/clean/links.csv",
-                     "./data/clean/stop_codes_to_station_id_crosswalk.csv",
+mbta_system = System("./static/data/clean/stations.csv",
+                     "./static/data/clean/links.csv",
+                     "./static/data/clean/stop_codes_to_station_id_crosswalk.csv",
                      "https://cdn.mbta.com/realtime/VehiclePositions.pb")
 stations_df = mbta_system.station_data.copy()
 stations_df.loc[:, 'map_size'] = stations_df['map_color'].replace({'black': 5,
@@ -25,7 +25,7 @@ stations_df.loc[:, 'map_size'] = stations_df['map_color'].replace({'black': 5,
                                                                    'blue': 10,
                                                                    'orange': 10})
 links_df = mbta_system.links_data.copy()
-charles_river_df = pd.read_csv("./data/clean/charles_river.csv")
+charles_river_df = pd.read_csv("./static/data/clean/charles_river.csv")
 
 # Create figure object
 base_figure = go.Figure(layout={'dragmode': False})
