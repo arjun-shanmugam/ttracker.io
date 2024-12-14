@@ -34,7 +34,7 @@ class GTFSRealtime:
         self._vehicle_positions_feed = gtfs_realtime_pb2.FeedMessage()
         self._trip_updates_feed = gtfs_realtime_pb2.FeedMessage()
         self._stop_code_to_station_id_crosswalk = read_csv(path_to_stop_code_to_station_id_crosswalk,
-                                                              index_col='stop_code')['station_id']
+                                                              index_col='stop_code')['station_id'].astype("category")
 
     def _clean_vehicle_positions_df(self, vehicles_df: DataFrame, columns_to_keep: List[str]):
         # keep only needed columns

@@ -51,7 +51,7 @@ class System:
             ['route_id', 'target_station_id', 'direction'])
 
         self._gtfs = GTFSRealtime(gtfs_realtime_url, path_to_stop_codes_station_id_crosswalk)
-
+        print('test')
     def update_trains(self):
         train_position_data = self._gtfs.get_train_positions()
         current_position_map = train_position_data[['longitude', 'latitude']].values
@@ -83,15 +83,14 @@ class System:
         x = screen_coordinates_moving_trains[:, 0]
         y = screen_coordinates_moving_trains[:, 1]
 
-        # Train colors
-        colors = train_position_data['route_id'].str.split("-").str[0].values
         # Build hover text
-        train_id = ("Train: " + train_position_data['id'].reset_index(drop=True))
-        train_status = train_position_data['current_status'].replace({0: "Next Stop: ",
-                                                                      1: "Stopped At: ",
-                                                                      2: "Next Stop: "}).reset_index(drop=True)
-        train_status = (train_status +
-                        self.station_data.loc[train_position_data['next_station_id'], 'name'].reset_index(drop=True))
-        hover_text = (train_id + "<br>" + train_status).values
-
-        return x, y, colors, hover_text
+        return (x,
+                y,
+                train_position_data['route_id'].str.split("-").str[0].values,
+                (("Train: " + train_position_data['id'].reset_index(drop=True))
+                 + "<br>" +
+                 (train_position_data['current_status'].replace({0: "Next Stop: ",
+                                                                            1: "Stopped At: ",
+                                                                            2: "Next Stop: "}).reset_index(drop=True)) +
+                 self.station_data.loc[train_position_data['next_station_id'], 'name'].reset_index(
+                     drop=True)).values)

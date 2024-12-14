@@ -17,7 +17,6 @@ mbta_system = System("./static/data/clean/stations.csv",
 stations_df = mbta_system.station_data
 
 links_df = mbta_system.links_data
-print(links_df.memory_usage(deep=True))
 
 charles_river_df = read_csv("./static/data/clean/charles_river.csv")
 
@@ -60,7 +59,7 @@ app.layout = html.Div(children=[
 
                                    }),
                  ]),
-        dcc.Interval(id='interval-component', interval=3000, n_intervals=0)  # Update every second
+        dcc.Interval(id='interval-component', interval=1500, n_intervals=0)  # Update every second
     ])], style={
         'display': 'flex',  # Enable flexbox
         'justify-content': 'center',  # Center horizontally
