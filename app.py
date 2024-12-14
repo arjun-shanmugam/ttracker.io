@@ -1,18 +1,16 @@
-import threading
-import time
-import dash
-import pandas as pd
-import psutil
-from dash import dcc, Input, Output, html
+from pandas import read_csv
+from dash import dcc, Input, Output, html, Dash
 import plotly.graph_objects as go
-import dash_bootstrap_components as dbc
+from dash_bootstrap_components.themes import BOOTSTRAP
+from dash_bootstrap_components import Row, Col
 from ttracker.plotting_tools import plot_map
 from ttracker.system import System
 # Memory monitoring function
 
 # Initialize the Dash app
-app = dash.Dash(__name__, external_stylesheets=[dbc.themes.BOOTSTRAP], update_title=None)
+app = Dash(__name__, external_stylesheets=[BOOTSTRAP], update_title=None)
 server = app.server
+app.title = "T Tracker"
 # prepare data
 mbta_system = System("./static/data/clean/stations.csv",
                      "./static/data/clean/links.csv",
@@ -25,7 +23,7 @@ stations_df.loc[:, 'map_size'] = stations_df['map_color'].replace({'black': 5,
                                                                    'blue': 10,
                                                                    'orange': 10})
 links_df = mbta_system.links_data.copy()
-charles_river_df = pd.read_csv("./static/data/clean/charles_river.csv")
+charles_river_df = read_csv("./static/data/clean/charles_river.csv")
 
 # Create figure object
 base_figure = go.Figure(layout={'dragmode': False})
@@ -34,7 +32,7 @@ plot_map("mbta", base_figure, links_df, stations_df, charles_river_df)
 # Layout of the app
 app.css.config.serve_locally = True
 app.layout = html.Div(children=[
-    dash.html.Center([html.H1("ttracker.io", style={
+    html.Center([html.H1("ttracker.io", style={
         "position": "fixed",
         "top": 0,
         "left": 0,
@@ -46,8 +44,8 @@ app.layout = html.Div(children=[
         'display': 'inline-block'
     })]
                      ),
-    html.Div(children=[dbc.Row([
-        dbc.Col([dcc.Graph(id='train-map',
+    html.Div(children=[Row([
+        Col([dcc.Graph(id='train-map',
                            figure=base_figure,
                            style={
                                'border': '2px solid black',

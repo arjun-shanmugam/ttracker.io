@@ -1,11 +1,8 @@
-from datetime import date
 from typing import List
-
-import pandas as pd
-import requests
+from pandas import read_csv, Series, DataFrame, json_normalize
+from requests import get
 from protobuf_to_dict import protobuf_to_dict
 from google.transit import gtfs_realtime_pb2
-import gtfs_kit as gk
 
 
 def _clean_stop_code(raw_stop_code: str):
@@ -27,7 +24,7 @@ def _clean_stop_code(raw_stop_code: str):
 class GTFSRealtime:
     _gtfs_rt_vehicle_positions: str
     _gtfs_rt_trip_updates: str
-    _stop_code_to_station_id_crosswalk: pd.Series
+    _stop_code_to_station_id_crosswalk: Series
 
     def __init__(self,
                  gtfs_rt_vehicle_positions_url: str,
@@ -36,10 +33,10 @@ class GTFSRealtime:
         self._gtfs_rt_trip_updates = "https://cdn.mbta.com/realtime/TripUpdates.pb"  # TODO: add as param
         self._vehicle_positions_feed = gtfs_realtime_pb2.FeedMessage()
         self._trip_updates_feed = gtfs_realtime_pb2.FeedMessage()
-        self._stop_code_to_station_id_crosswalk = pd.read_csv(path_to_stop_code_to_station_id_crosswalk,
+        self._stop_code_to_station_id_crosswalk = read_csv(path_to_stop_code_to_station_id_crosswalk,
                                                               index_col='stop_code')['station_id']
 
-    def _clean_vehicle_positions_df(self, vehicles_df: pd.DataFrame, columns_to_keep: List[str]):
+    def _clean_vehicle_positions_df(self, vehicles_df: DataFrame, columns_to_keep: List[str]):
         # keep only needed columns
         clean_vehicles_df = vehicles_df.loc[:, columns_to_keep]
 
@@ -64,7 +61,7 @@ class GTFSRealtime:
 
         return clean_vehicles_df
 
-    def _clean_trip_updates_df(self, trip_updates_df: pd.DataFrame,
+    def _clean_trip_updates_df(self, trip_updates_df: DataFrame,
                                columns_to_keep: List[str],
                                routes_to_keep: List[str]):
         # keep only needed columns
@@ -87,7 +84,7 @@ class GTFSRealtime:
         clean_trip_updates_df = clean_trip_updates_df.explode('stop_time_update')
 
         # get sequence of stop_ids for each trip
-        stop_id = pd.json_normalize(clean_trip_updates_df['stop_time_update'],
+        stop_id = json_normalize(clean_trip_updates_df['stop_time_update'],
                                     max_level=0)[['stop_id']]
 
         # drop original stop_time_updates column
@@ -99,17 +96,17 @@ class GTFSRealtime:
         return clean_trip_updates_df
 
     def get_train_positions(self):
-        vehicle_positions_response = requests.get(self._gtfs_rt_vehicle_positions)
+        vehicle_positions_response = get(self._gtfs_rt_vehicle_positions)
         self._vehicle_positions_feed.ParseFromString(vehicle_positions_response.content)
-        vehicle_positions_df = pd.json_normalize(protobuf_to_dict(self._vehicle_positions_feed)['entity'])
+        vehicle_positions_df = json_normalize(protobuf_to_dict(self._vehicle_positions_feed)['entity'])
         columns_to_keep = ['id', 'vehicle.trip.trip_id', 'vehicle.trip.route_id', 'vehicle.stop_id',
                            'vehicle.current_status', 'vehicle.trip.direction_id', 'vehicle.position.longitude',
                            'vehicle.position.latitude']
         vehicle_positions_df = self._clean_vehicle_positions_df(vehicle_positions_df, columns_to_keep).set_index(
             'trip_id')
-        trip_updates_response = requests.get(self._gtfs_rt_trip_updates)
+        trip_updates_response = get(self._gtfs_rt_trip_updates)
         self._trip_updates_feed.ParseFromString(trip_updates_response.content)
-        trip_updates_df = pd.json_normalize(protobuf_to_dict(self._trip_updates_feed)['entity'])
+        trip_updates_df = json_normalize(protobuf_to_dict(self._trip_updates_feed)['entity'])
         columns_to_keep = ['trip_update.trip.trip_id',
                            'trip_update.stop_time_update',
                            'trip_update.trip.route_id']
@@ -121,9 +118,9 @@ class GTFSRealtime:
         red_line_trips = (trip_updates_df
                           .groupby('trip_id')['stop_id']
                           .agg(lambda group: group.isin(red_line_a_station_codes).any()))
-        red_a_trips = pd.Series(red_line_trips.loc[red_line_trips].index)
+        red_a_trips = Series(red_line_trips.loc[red_line_trips].index)
         red_a_trips = red_a_trips.loc[red_a_trips.isin(vehicle_positions_df.index)]
-        red_b_trips = pd.Series(red_line_trips.loc[~red_line_trips].index)
+        red_b_trips = Series(red_line_trips.loc[~red_line_trips].index)
         red_b_trips = red_b_trips.loc[red_b_trips.isin(vehicle_positions_df.index)]
 
         vehicle_positions_df.loc[red_a_trips, 'route_id'] = 'red-a'
