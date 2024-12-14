@@ -66,7 +66,7 @@ app.layout = html.Div(children=[
 
                                    }),
                  ]),
-        dcc.Interval(id='interval-component', interval=3000, n_intervals=0)  # Update every second
+        dcc.Interval(id='interval-component', interval=4000, n_intervals=0)  # Update every second
     ])], style={
         'display': 'flex',  # Enable flexbox
         'justify-content': 'center',  # Center horizontally
