@@ -4,12 +4,12 @@ from pathlib import Path
 import gtfs_kit
 import pandas as pd
 
-GREEN_LINE_ROUTE_INFORMATION = "../../data/raw/station-network_green_line.json"
-NON_GREEN_LINE_ROUTE_INFORMATION = "../../data/raw/station-network.json"
-CLEANED_STATION_DATA = "../../data/clean/stations.csv"
-MBTA_GTFS = "../../data/raw/MBTA_GTFS.zip"
-STOP_CODES_STATION_ID_CROSSWALK = "../../data/clean/stop_codes_to_station_id_crosswalk.csv"
-OUTPUT_DATA = "../../data/clean/links.csv"
+GREEN_LINE_ROUTE_INFORMATION = "../../static/data/raw/station-network_green_line.json"
+NON_GREEN_LINE_ROUTE_INFORMATION = "../../static/data/raw/station-network.json"
+CLEANED_STATION_DATA = "../../static/data/clean/stations.csv"
+MBTA_GTFS = "../../static/data/raw/MBTA_GTFS.zip"
+STOP_CODES_STATION_ID_CROSSWALK = "../../static/data/clean/stop_codes_to_station_id_crosswalk.csv"
+OUTPUT_DATA = "../../static/data/clean/links.csv"
 
 links_dfs = []
 for ROUTE_INFORMATION in [GREEN_LINE_ROUTE_INFORMATION, NON_GREEN_LINE_ROUTE_INFORMATION]:
@@ -150,7 +150,7 @@ links_df = links_df.loc[links_df['route_id'] != "red", :]
 directions = []
 stop_orders = {}
 for route_id in ['red-a', 'red-b', 'blue', 'orange', 'green-b', 'green-c', 'green-d', 'green-e']:
-    stop_orders[route_id] = pd.read_csv(f"../../data/raw/{route_id}_stop_order.csv")['station_id']
+    stop_orders[route_id] = pd.read_csv(f"../../static/data/raw/{route_id}_stop_order.csv")['station_id']
 for link in links_df.to_dict('records'):
     route_id = link['route_id']
     stop_order = stop_orders[route_id]

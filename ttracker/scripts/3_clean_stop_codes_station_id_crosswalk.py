@@ -2,8 +2,8 @@ import pandas as pd
 import gtfs_kit
 from pathlib import Path
 
-MBTA_GTFS = "../../data/raw/MBTA_GTFS.zip"
-OUTPUT_STATION_DATA = "../../data/clean/stop_codes_to_station_id_crosswalk.csv"
+MBTA_GTFS = "../../static/data/raw/MBTA_GTFS.zip"
+OUTPUT_STATION_DATA = "../../static/data/clean/stop_codes_to_station_id_crosswalk.csv"
 
 
 feed = gtfs_kit.read_feed(Path(MBTA_GTFS), dist_units='km')

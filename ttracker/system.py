@@ -40,10 +40,13 @@ class System:
                  path_to_links_data: str,
                  path_to_stop_codes_station_id_crosswalk: str,
                  gtfs_realtime_url: str):
-        cols_to_keep = ['station_id', 'name', 'x', 'y', 'stop_lat', 'stop_lon', 'endpoint', 'map_color']
+        cols_to_keep = ['station_id', 'name', 'x', 'y', 'stop_lat', 'stop_lon', 'endpoint']
         self.station_data = pd.read_csv(path_to_station_data, usecols=cols_to_keep, index_col='station_id')
 
-        self.links_data = pd.read_csv(path_to_links_data)
+        self.links_data = (pd.read_csv(path_to_links_data, dtype={'source_station_id': 'category',
+                                                                 'target_station_id': 'category',
+                                                                 'route_id': 'category'})
+                           .drop(columns=['Unnamed: 0']))
         self._previous_station = pd.read_csv(path_to_links_data).set_index(
             ['route_id', 'target_station_id', 'direction'])
 

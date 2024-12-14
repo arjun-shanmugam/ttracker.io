@@ -4,12 +4,12 @@ import gtfs_kit
 from pathlib import Path
 import math
 
-GREEN_LINE_STATION_COORDINATES = "../../data/raw/spider_green_line.json"
-GREEN_LINE_STATION_NAMES = "../../data/raw/station-network_green_line.json"
-NON_GREEN_LINE_STATION_COORDINATES = "../../data/raw/spider.json"
-NON_GREEN_LINE_STATION_NAMES = "../../data/raw/station-network.json"
-MBTA_GTFS = "../../data/raw/MBTA_GTFS.zip"
-OUTPUT_STATION_DATA = "../../data/clean/stations.csv"
+GREEN_LINE_STATION_COORDINATES = "../../static/data/raw/spider_green_line.json"
+GREEN_LINE_STATION_NAMES = "../../static/data/raw/station-network_green_line.json"
+NON_GREEN_LINE_STATION_COORDINATES = "../../static/data/raw/spider.json"
+NON_GREEN_LINE_STATION_NAMES = "../../static/data/raw/station-network.json"
+MBTA_GTFS = "../../static/data/raw/MBTA_GTFS.zip"
+OUTPUT_STATION_DATA = "../../static/data/clean/stations.csv"
 
 # Get station coordinates on canvas.
 # read raw green line coordinates.
@@ -121,12 +121,6 @@ endpoints = ["place-alfcl", "place-asmnl", "place-brntn",
 station_df.loc[:, 'endpoint'] = 0
 station_df.loc[endpoints, 'endpoint'] = 1
 
-# set station colors
-station_df.loc[:, 'map_color'] = 'black'
-station_df.loc[endpoints[0:3], 'map_color'] = 'red'
-station_df.loc[endpoints[3:9], 'map_color'] = 'green'
-station_df.loc[endpoints[9:11], 'map_color'] = 'orange'
-station_df.loc[endpoints[11:13], 'map_color'] = 'blue'
 
 # save cleaned data
 station_df.index.name = "station_id"

@@ -5,8 +5,6 @@ from dash_bootstrap_components.themes import BOOTSTRAP
 from dash_bootstrap_components import Row, Col
 from ttracker.plotting_tools import plot_map
 from ttracker.system import System
-# Memory monitoring function
-
 # Initialize the Dash app
 app = Dash(__name__, external_stylesheets=[BOOTSTRAP], update_title=None)
 server = app.server
@@ -16,13 +14,11 @@ mbta_system = System("./static/data/clean/stations.csv",
                      "./static/data/clean/links.csv",
                      "./static/data/clean/stop_codes_to_station_id_crosswalk.csv",
                      "https://cdn.mbta.com/realtime/VehiclePositions.pb")
-stations_df = mbta_system.station_data.copy()
-stations_df.loc[:, 'map_size'] = stations_df['map_color'].replace({'black': 5,
-                                                                   'red': 10,
-                                                                   'green': 10,
-                                                                   'blue': 10,
-                                                                   'orange': 10})
-links_df = mbta_system.links_data.copy()
+stations_df = mbta_system.station_data
+
+links_df = mbta_system.links_data
+print(links_df.memory_usage(deep=True))
+
 charles_river_df = read_csv("./static/data/clean/charles_river.csv")
 
 # Create figure object
@@ -64,7 +60,7 @@ app.layout = html.Div(children=[
 
                                    }),
                  ]),
-        dcc.Interval(id='interval-component', interval=4000, n_intervals=0)  # Update every second
+        dcc.Interval(id='interval-component', interval=3000, n_intervals=0)  # Update every second
     ])], style={
         'display': 'flex',  # Enable flexbox
         'justify-content': 'center',  # Center horizontally
