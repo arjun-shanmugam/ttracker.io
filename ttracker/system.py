@@ -51,7 +51,6 @@ class System:
             ['route_id', 'target_station_id', 'direction'])
 
         self._gtfs = GTFSRealtime(gtfs_realtime_url, path_to_stop_codes_station_id_crosswalk)
-        print('test')
     def update_trains(self):
         train_position_data = self._gtfs.get_train_positions()
         current_position_map = train_position_data[['longitude', 'latitude']].values

@@ -14,15 +14,11 @@ mbta_system = System("./static/data/clean/stations.csv",
                      "./static/data/clean/links.csv",
                      "./static/data/clean/stop_codes_to_station_id_crosswalk.csv",
                      "https://cdn.mbta.com/realtime/VehiclePositions.pb")
-stations_df = mbta_system.station_data
 
-links_df = mbta_system.links_data
-
-charles_river_df = read_csv("./static/data/clean/charles_river.csv")
 
 # Create figure object
 base_figure = go.Figure(layout={'dragmode': False})
-plot_map("mbta", base_figure, links_df, stations_df, charles_river_df)
+plot_map("mbta", base_figure, mbta_system.links_data, mbta_system.station_data, read_csv("./static/data/clean/charles_river.csv"))
 
 # Layout of the app
 app.css.config.serve_locally = True
