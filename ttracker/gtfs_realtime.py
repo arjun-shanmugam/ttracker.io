@@ -1,5 +1,6 @@
 from typing import List
 from pandas import read_csv, Series, DataFrame, json_normalize
+
 from requests import get
 from protobuf_to_dict import protobuf_to_dict
 from google.transit import gtfs_realtime_pb2
@@ -36,12 +37,11 @@ class GTFSRealtime:
         self._stop_code_to_station_id_crosswalk = read_csv(path_to_stop_code_to_station_id_crosswalk,
                                                               index_col='stop_code')['station_id'].astype("category")
 
-    def _clean_vehicle_positions_df(self, vehicles_df: DataFrame, columns_to_keep: List[str]):
-        # keep only needed columns
-        clean_vehicles_df = vehicles_df.loc[:, columns_to_keep]
+    def _clean_vehicle_positions_df(self, vehicles_df: DataFrame):
+
 
         # rename columns
-        clean_vehicles_df = clean_vehicles_df.rename(columns=lambda column: column.split(".")[-1])
+        clean_vehicles_df = vehicles_df.rename(columns=lambda column: column.split(".")[-1])
 
         # keep only rapid transit route ids
         rapid_transit_route_ids = ["Blue", "Red", "Orange", "Green-B", "Green-C", "Green-D", "Green-E"]
@@ -61,14 +61,13 @@ class GTFSRealtime:
 
         return clean_vehicles_df
 
-    def _clean_trip_updates_df(self, trip_updates_df: DataFrame,
-                               columns_to_keep: List[str],
+    def _clean_trip_updates_df(self,
+                               trip_updates_df: DataFrame,
                                routes_to_keep: List[str]):
-        # keep only needed columns
-        clean_trip_updates_df = trip_updates_df.loc[:, columns_to_keep]
+
 
         # rename columns
-        clean_trip_updates_df = clean_trip_updates_df.rename(columns=lambda column: column.split(".")[-1])
+        clean_trip_updates_df = trip_updates_df.rename(columns=lambda column: column.split(".")[-1])
 
         # keep only rapid transit route ids
         rapid_transit_mask = clean_trip_updates_df['route_id'].isin(routes_to_keep)
@@ -98,20 +97,21 @@ class GTFSRealtime:
     def get_train_positions(self):
         vehicle_positions_response = get(self._gtfs_rt_vehicle_positions)
         self._vehicle_positions_feed.ParseFromString(vehicle_positions_response.content)
-        vehicle_positions_df = json_normalize(protobuf_to_dict(self._vehicle_positions_feed)['entity'])
         columns_to_keep = ['id', 'vehicle.trip.trip_id', 'vehicle.trip.route_id', 'vehicle.stop_id',
                            'vehicle.current_status', 'vehicle.trip.direction_id', 'vehicle.position.longitude',
                            'vehicle.position.latitude']
-        vehicle_positions_df = self._clean_vehicle_positions_df(vehicle_positions_df, columns_to_keep).set_index(
+        vehicle_positions_df = json_normalize(protobuf_to_dict(self._vehicle_positions_feed)['entity'])[columns_to_keep]
+        vehicle_positions_df = self._clean_vehicle_positions_df(vehicle_positions_df).set_index(
             'trip_id')
         trip_updates_response = get(self._gtfs_rt_trip_updates)
         self._trip_updates_feed.ParseFromString(trip_updates_response.content)
-        trip_updates_df = json_normalize(protobuf_to_dict(self._trip_updates_feed)['entity'])
         columns_to_keep = ['trip_update.trip.trip_id',
                            'trip_update.stop_time_update',
                            'trip_update.trip.route_id']
+        trip_updates_df = json_normalize(protobuf_to_dict(self._trip_updates_feed)['entity'])[columns_to_keep]
+
         routes_to_keep = ["Red"]
-        trip_updates_df = self._clean_trip_updates_df(trip_updates_df, columns_to_keep, routes_to_keep)
+        trip_updates_df = self._clean_trip_updates_df(trip_updates_df, routes_to_keep)
         red_line_a_station_codes = ['334', '70093', '70094', '70261', '70091', '70092', '323', '70089', '70090',
                                     '70087', '70088']
         # true if red-a, false if red-b

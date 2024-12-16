@@ -1,4 +1,5 @@
 from pandas import read_csv
+
 from dash import dcc, Input, Output, html, Dash
 import plotly.graph_objects as go
 from dash_bootstrap_components.themes import BOOTSTRAP

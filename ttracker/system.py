@@ -1,12 +1,8 @@
-from typing import List
-
-import numpy as np
+from numpy import sqrt, where, newaxis
 import pandas as pd
 
 from ttracker.gtfs_realtime import GTFSRealtime
-from google.transit import gtfs_realtime_pb2
-import requests
-import time
+
 
 
 def _get_portion_of_distance_traveled(p1s, p2s, p3s, vehicle_stop_status):
@@ -16,10 +12,10 @@ def _get_portion_of_distance_traveled(p1s, p2s, p3s, vehicle_stop_status):
     det = dxs * dxs + dys * dys
     det[det == 0] = 1  # avoid nan error
     a = (dys * (y3s - y1s) + dxs * (x3s - x1s)) / det
-    lengths_p1s_p2s = np.sqrt(dxs * dxs + dys * dys)
-    lengths_projections = np.sqrt((a * dxs) * (a * dxs) + (a * dys) * (a * dys))
+    lengths_p1s_p2s = sqrt(dxs * dxs + dys * dys)
+    lengths_projections = sqrt((a * dxs) * (a * dxs) + (a * dys) * (a * dys))
 
-    lengths_p1s_p2s = np.where(lengths_p1s_p2s == 0, 1, lengths_p1s_p2s)
+    lengths_p1s_p2s = where(lengths_p1s_p2s == 0, 1, lengths_p1s_p2s)
     portions_of_distances_traveled = lengths_projections / lengths_p1s_p2s
     stopped_mask = (vehicle_stop_status == 1)
     portions_of_distances_traveled[stopped_mask] = 1
@@ -27,7 +23,7 @@ def _get_portion_of_distance_traveled(p1s, p2s, p3s, vehicle_stop_status):
 
 
 def _midpoint(p1s, p2s, percent):
-    return p1s + (p2s - p1s) * percent[:, np.newaxis]
+    return p1s + (p2s - p1s) * percent[:, newaxis]
 
 
 class System:
