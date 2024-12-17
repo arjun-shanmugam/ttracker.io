@@ -16,7 +16,8 @@ def plot_map(style: str,
                 y=charles_river_df['y1'],
                 mode='lines',
                 line=dict(color='rgb(145,193,217)'),
-                showlegend=False
+                showlegend=False,
+                hoverinfo='none'
             ))
         figure.add_trace(go.Scatter(
             x=charles_river_df['x'],
@@ -25,7 +26,8 @@ def plot_map(style: str,
             fill='tonexty',  # Fills between y2 and the previous trace (y1)
             line=dict(color='rgb(145,193,217)'),
             fillcolor='rgb(145,193,217)',
-            showlegend=False
+            showlegend=False,
+            hoverinfo='none'
         ))
 
         # Add a triangle using a custom SVG path
