@@ -39,43 +39,30 @@ class GTFSRealtime:
 
     def _clean_vehicle_positions_df(self, vehicles_df: pl.LazyFrame):
         rapid_transit_route_ids = ["Blue", "Red", "Orange", "Green-B", "Green-C", "Green-D", "Green-E"]
-        clean_vehicles_df = (vehicles_df
-                             .rename(lambda column: column.split(".")[-1])
-                             .filter(pl.col("route_id").is_in(rapid_transit_route_ids))
-                             .with_columns(route_id=pl.col("route_id").str.to_lowercase())
-                             .filter(pl.col("stop_id") != "71199")
-                             .drop_nulls()
-                             .rename({'stop_id': 'next_stop_id'}))
+        clean_vehicles_df = (
+            vehicles_df
+            .rename(lambda column: column.split(".")[-1])
+            .filter(pl.col("route_id").is_in(rapid_transit_route_ids))
+            .with_columns(route_id=pl.col("route_id").str.to_lowercase())
+            .filter(pl.col("stop_id") != "71199")
+            .drop_nulls()
+            .rename({'stop_id': 'next_stop_id'})
+        )
         return clean_vehicles_df
 
     def _clean_trip_updates_df(self,
                                trip_updates_df: DataFrame,
                                routes_to_keep: List[str]):
-        # rename columns
-        clean_trip_updates_df = trip_updates_df.rename(columns=lambda column: column.split(".")[-1])
-
-        # keep only rapid transit route ids
-        rapid_transit_mask = clean_trip_updates_df['route_id'].isin(routes_to_keep)
-        clean_trip_updates_df = clean_trip_updates_df.loc[rapid_transit_mask, :]
-
-        # no longer need route id column
-        clean_trip_updates_df = clean_trip_updates_df.drop(columns='route_id')
-
-        # drop rows without information
-        clean_trip_updates_df = clean_trip_updates_df.dropna()
-
-        # convert stop_time_update, which is a column of lists, into a column of dicts by expanding rows
-        clean_trip_updates_df = clean_trip_updates_df.explode('stop_time_update')
-
-        # get sequence of stop_ids for each trip
-        stop_id = clean_trip_updates_df['stop_time_update'].astype(str).str.split("stop_id",regex=False).str[-1].str.extract('(\d+)', expand=False).astype(int)
-
-        # drop original stop_time_updates column
-        clean_trip_updates_df = clean_trip_updates_df.drop(columns='stop_time_update')
-
-        # add stop_id column
-        clean_trip_updates_df.loc[:, ['stop_id']] = stop_id.values
-
+        clean_trip_updates_df = (
+            trip_updates_df
+            .rename(lambda column: column.split(".")[-1])
+            .filter(pl.col("route_id").is_in(routes_to_keep))
+            .drop("route_id")
+            .drop_nulls()
+            .explode("stop_time_update")
+            .with_columns(stop_id=pl.col("stop_time_update").struct.json_encode().cast(pl.String).str.split("stop_id").list.get(-1).str.extract('(\d+)').cast(pl.Int32))
+            .drop("stop_time_update")
+        )
         return clean_trip_updates_df
 
     def get_train_positions(self):
@@ -85,7 +72,8 @@ class GTFSRealtime:
         columns_to_keep = ['id', 'vehicle.trip.trip_id', 'vehicle.trip.route_id', 'vehicle.stop_id',
                            'vehicle.current_status', 'vehicle.trip.direction_id', 'vehicle.position.longitude',
                            'vehicle.position.latitude']
-        vehicle_positions_df = pl.LazyFrame(json_normalize(protobuf_to_dict(self._vehicle_positions_feed)['entity'])[columns_to_keep])
+        vehicle_positions_df = pl.LazyFrame(
+            json_normalize(protobuf_to_dict(self._vehicle_positions_feed)['entity'])[columns_to_keep])
         vehicle_positions_df = self._clean_vehicle_positions_df(vehicle_positions_df)
 
         # Pull and clean trip updates obtain a list of red line a, red line b trip
@@ -94,8 +82,8 @@ class GTFSRealtime:
         columns_to_keep = ['trip_update.trip.trip_id',
                            'trip_update.stop_time_update',
                            'trip_update.trip.route_id']
-        trip_updates_df = json_normalize(protobuf_to_dict(self._trip_updates_feed)['entity'])[columns_to_keep]
-
+        trip_updates_df = pl.LazyFrame(
+            json_normalize(protobuf_to_dict(self._trip_updates_feed)['entity'])[columns_to_keep])
         routes_to_keep = ["Red"]
         trip_updates_df = self._clean_trip_updates_df(trip_updates_df, routes_to_keep)
         red_line_a_station_codes = ['334', '70093', '70094', '70261', '70091', '70092', '323', '70089', '70090',
