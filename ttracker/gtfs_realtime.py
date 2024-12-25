@@ -68,8 +68,7 @@ class GTFSRealtime:
         clean_trip_updates_df = clean_trip_updates_df.explode('stop_time_update')
 
         # get sequence of stop_ids for each trip
-        stop_id = json_normalize(clean_trip_updates_df['stop_time_update'],
-                                 max_level=0)[['stop_id']]
+        stop_id = clean_trip_updates_df['stop_time_update'].astype(str).str.split("stop_id",regex=False).str[-1].str.extract('(\d+)', expand=False).astype(int)
 
         # drop original stop_time_updates column
         clean_trip_updates_df = clean_trip_updates_df.drop(columns='stop_time_update')
@@ -80,6 +79,7 @@ class GTFSRealtime:
         return clean_trip_updates_df
 
     def get_train_positions(self):
+        # Pull and clean vehicle positions
         vehicle_positions_response = get(self._gtfs_rt_vehicle_positions)
         self._vehicle_positions_feed.ParseFromString(vehicle_positions_response.content)
         columns_to_keep = ['id', 'vehicle.trip.trip_id', 'vehicle.trip.route_id', 'vehicle.stop_id',
@@ -87,12 +87,14 @@ class GTFSRealtime:
                            'vehicle.position.latitude']
         vehicle_positions_df = pl.LazyFrame(json_normalize(protobuf_to_dict(self._vehicle_positions_feed)['entity'])[columns_to_keep])
         vehicle_positions_df = self._clean_vehicle_positions_df(vehicle_positions_df)
+
+        # Pull and clean trip updates obtain a list of red line a, red line b trip
         trip_updates_response = get(self._gtfs_rt_trip_updates)
         self._trip_updates_feed.ParseFromString(trip_updates_response.content)
         columns_to_keep = ['trip_update.trip.trip_id',
                            'trip_update.stop_time_update',
                            'trip_update.trip.route_id']
-        trip_updates_df = pl.LazyFrame(json_normalize(protobuf_to_dict(self._trip_updates_feed)['entity'])[columns_to_keep])
+        trip_updates_df = json_normalize(protobuf_to_dict(self._trip_updates_feed)['entity'])[columns_to_keep]
 
         routes_to_keep = ["Red"]
         trip_updates_df = self._clean_trip_updates_df(trip_updates_df, routes_to_keep)
@@ -103,10 +105,12 @@ class GTFSRealtime:
                           .groupby('trip_id')['stop_id']
                           .agg(lambda group: group.isin(red_line_a_station_codes).any()))
         red_a_trips = Series(red_line_trips.loc[red_line_trips].index)
-        red_a_trips = red_a_trips.loc[red_a_trips.isin(vehicle_positions_df.index)]
         red_b_trips = Series(red_line_trips.loc[~red_line_trips].index)
-        red_b_trips = red_b_trips.loc[red_b_trips.isin(vehicle_positions_df.index)]
 
+        # TODO:
+        # The iterables red_a_trips and red_b_trips contain lists of trip ids that correspond to
+        # red line a and red line b trips. using these lists, re-assign vehicle rows in the vehicle positions
+        # df that currently have route id == red to have route id == red_a or red b appropriately
         vehicle_positions_df.loc[red_a_trips, 'route_id'] = 'red-a'
         vehicle_positions_df.loc[red_b_trips, 'route_id'] = 'red-b'
         vehicle_positions_df = vehicle_positions_df.loc[vehicle_positions_df['route_id'] != 'red']
