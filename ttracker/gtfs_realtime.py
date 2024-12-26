@@ -46,6 +46,7 @@ class GTFSRealtime:
             .with_columns(route_id=pl.col("route_id").str.to_lowercase())
             .filter(pl.col("stop_id") != "71199")
             .drop_nulls()
+            .drop_nans()
             .rename({'stop_id': 'next_stop_id'})
         )
         return clean_vehicles_df
@@ -59,8 +60,11 @@ class GTFSRealtime:
             .filter(pl.col("route_id").is_in(routes_to_keep))
             .drop("route_id")
             .drop_nulls()
+            .drop_nans()
             .explode("stop_time_update")
-            .with_columns(stop_id=pl.col("stop_time_update").struct.json_encode().cast(pl.String).str.split("stop_id").list.get(-1).str.extract('(\d+)').cast(pl.Int32))
+            .with_columns(
+                stop_id=pl.col("stop_time_update").struct.json_encode().cast(pl.String).str.split("stop_id").list.get(
+                    -1).str.extract('(\d+)').cast(pl.Int32))
             .drop("stop_time_update")
         )
         return clean_trip_updates_df
@@ -76,7 +80,7 @@ class GTFSRealtime:
             json_normalize(protobuf_to_dict(self._vehicle_positions_feed)['entity'])[columns_to_keep])
         vehicle_positions_df = self._clean_vehicle_positions_df(vehicle_positions_df)
 
-        # Pull and clean trip updates obtain a list of red line a, red line b trip
+        # Pull and clean trip updates obtain a list of red line a, red line b trips, then set route_id column of vehicles df appropriately
         trip_updates_response = get(self._gtfs_rt_trip_updates)
         self._trip_updates_feed.ParseFromString(trip_updates_response.content)
         columns_to_keep = ['trip_update.trip.trip_id',
@@ -86,43 +90,69 @@ class GTFSRealtime:
             json_normalize(protobuf_to_dict(self._trip_updates_feed)['entity'])[columns_to_keep])
         routes_to_keep = ["Red"]
         trip_updates_df = self._clean_trip_updates_df(trip_updates_df, routes_to_keep)
-        red_line_a_station_codes = ['334', '70093', '70094', '70261', '70091', '70092', '323', '70089', '70090',
-                                    '70087', '70088']
+        red_line_a_station_codes = [334, 70093, 70094, 70261, 70091, 70092, 323, 70089, 70090,
+                                    70087, 70088]
         # true if red-a, false if red-b
-        red_line_trips = (trip_updates_df
-                          .groupby('trip_id')['stop_id']
-                          .agg(lambda group: group.isin(red_line_a_station_codes).any()))
-        red_a_trips = Series(red_line_trips.loc[red_line_trips].index)
-        red_b_trips = Series(red_line_trips.loc[~red_line_trips].index)
+        red_line_a_or_b_trips_marked = (
+            trip_updates_df
+            .with_columns(red_line_a_stop=pl.col("stop_id").is_in(red_line_a_station_codes))
+            .group_by("trip_id")
+            .agg(pl.any("red_line_a_stop"))
+        )
+        red_a_trips = (
+            red_line_a_or_b_trips_marked
+            .filter(pl.col("red_line_a_stop") == True)
+            .select(pl.col("trip_id"))
+            .collect()
+        )
+        red_b_trips = (
+            red_line_a_or_b_trips_marked
+            .filter(pl.col("red_line_a_stop") == False)
+            .select(pl.col("trip_id"))
+            .collect()
+        )
+        vehicle_positions_df = (
+            vehicle_positions_df
+            .with_columns(
+                pl.when(pl.col("trip_id").is_in(red_a_trips))
+                .then(pl.lit("red-a"))
+                .when(pl.col("trip_id").is_in(red_b_trips))
+                .then(pl.lit("red-b"))
+                .otherwise(pl.col("route_id"))
+                .alias("route_id")
 
+            )
+        )
+
+        # Harmonize stop IDs for station endpoints
+        vehicle_positions_df = (
+            vehicle_positions_df
+            .with_columns(
+                pl.when(pl.col("next_stop_id").str.contains("Oak Grove", literal=True))
+                .then(70036)
+                .when(pl.col("next_stop_id").str.contains("Braintree", literal=True))
+                .then(38671)
+                .when(pl.col("next_stop_id").str.contains("Alewife", literal=True))
+                .then(141)
+                .when(pl.col("next_stop_id").str.contains("Forest Hills", literal=True))
+                .then(10642)
+                .when(pl.col("next_stop_id").str.contains("Union Square", literal=True))
+                .then(70503)
+                .otherwise(pl.col("next_stop_id"))
+                .cast(pl.Int64)
+                .alias("next_stop_id")
+
+            )
+        ).collect()
+
+        # Resume here
         # TODO:
-        # The iterables red_a_trips and red_b_trips contain lists of trip ids that correspond to
-        # red line a and red line b trips. using these lists, re-assign vehicle rows in the vehicle positions
-        # df that currently have route id == red to have route id == red_a or red b appropriately
-        vehicle_positions_df.loc[red_a_trips, 'route_id'] = 'red-a'
-        vehicle_positions_df.loc[red_b_trips, 'route_id'] = 'red-b'
-        vehicle_positions_df = vehicle_positions_df.loc[vehicle_positions_df['route_id'] != 'red']
+        # Getting an error, not sure if it is here or elsewhere
+        vehicle_positions_df = (
+            vehicle_positions_df
+            .with_columns(pl.Series(values=self._stop_code_to_station_id_crosswalk[
+                vehicle_positions_df.get_column("next_stop_id").to_list()], name="next_station_id"))
+            .drop("next_stop_id")
+        )
 
-        vehicle_positions_df.loc[vehicle_positions_df['next_stop_id'].str.contains("Oak Grove",
-                                                                                   regex=False,
-                                                                                   na=False), 'next_stop_id'] = 70036
-        vehicle_positions_df.loc[vehicle_positions_df['next_stop_id'].str.contains("Braintree",
-                                                                                   regex=False,
-                                                                                   na=False), 'next_stop_id'] = 38671
-        vehicle_positions_df.loc[vehicle_positions_df['next_stop_id'].str.contains("Alewife",
-                                                                                   regex=False,
-                                                                                   na=False), 'next_stop_id'] = 141
-        vehicle_positions_df.loc[vehicle_positions_df['next_stop_id'].str.contains("Forest Hills",
-                                                                                   regex=False,
-                                                                                   na=False), 'next_stop_id'] = 10642
-        vehicle_positions_df.loc[vehicle_positions_df['next_stop_id'].str.contains("Union Square",
-                                                                                   regex=False,
-                                                                                   na=False), 'next_stop_id'] = 70503
-
-        vehicle_positions_df.loc[:, 'next_stop_id'] = vehicle_positions_df['next_stop_id'].astype(int)
-        vehicle_positions_df.loc[:, 'next_station_id'] = self._stop_code_to_station_id_crosswalk[
-            vehicle_positions_df['next_stop_id']].values
-
-        vehicle_positions_df = vehicle_positions_df.drop(columns='next_stop_id')
-
-        return vehicle_positions_df
+        return vehicle_positions_df.to_pandas()
